@@ -1,3 +1,57 @@
 PUMP = TURNED_OFF,
 
 TURNED_OFF = (turn_on -> END).
+
+//
+//	~~BEGIN CHANNEL~~
+//
+
+// Line State of Channel
+const WithoutLine = 0
+const WithLine = 1
+
+range LineConnectedRange = WithoutLine..WithLine
+
+// Rate State of Channel
+const UnsetRate = 0
+const SetRate = 1
+
+range RateSetRange = UnsetRate..SetRate
+
+
+// VTBI State of Channel
+const UnsetVTBI = 0
+const SetVTBI = 1
+
+range VTBISetRange = UnsetVTBI..SetVTBI
+
+// Settings State of Channel
+const UnsavedSettings = 0
+const SavedSettings = 1
+
+range SettingsSavedRange = UnsavedSettings..SavedSettings
+
+CHANNEL_EXAMPLE = CHANNEL[WithoutLine][UnsetRate][UnsetVTBI][UnsavedSettings],
+
+CHANNEL[line:LineConnectedRange][rate:RateSetRange][vtbi:VTBISetRange][settings:SettingsSavedRange] = (
+	when (line == WithoutLine)
+		//we assume that after line connection the settings are discarded by default
+		connect_line -> CHANNEL[WithLine][UnsetRate][UnsetVTBI][UnsavedSettings]
+	|
+	when (line == WithLine)
+		//we assume that after the line is disconnected from the channel
+		//the settings are discarded by default
+		disconnect_line -> CHANNEL[WithoutLine][UnsetRate][UnsetVTBI][UnsavedSettings]
+	|
+	when (line == WithLine && rate == UnsetRate && settings == UnsavedSettings)
+		set_rate -> CHANNEL[line][SetRate][vtbi][settings]
+	|
+	when (line == WithLine && vtbi == UnsetVTBI && settings == UnsavedSettings)
+		set_vtbi -> CHANNEL[line][rate][SetVTBI][settings]
+	|
+	when (line == WithLine && rate == SetRate && vtbi == SetVTBI && settings == UnsavedSettings)
+		save_settings -> CHANNEL[line][rate][vtbi][SavedSettings]
+	|
+	when (settings == SavedSettings && line == WithLine)
+		discard_settings -> CHANNEL[line][UnsetRate][UnsetVTBI][UnsavedSettings]
+).
