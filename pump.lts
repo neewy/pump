@@ -1,0 +1,3 @@
+PUMP = TURNED_OFF,
+
+TURNED_OFF = (turn_on -> END).
