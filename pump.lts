@@ -1,10 +1,10 @@
-PUMP = TURNED_OFF,
+//======================
+// Constants and Ranges
+//======================
+const AlarmActivated = 0    // Alarm currently active
+const AlarmSilenced  = 1    // Alarm currently inactive
 
-TURNED_OFF = (turn_on -> END).
-
-//
-//	~~BEGIN CHANNEL~~
-//
+range AlarmStateT = AlarmActivated .. AlarmSilenced
 
 // Line State of Channel
 const WithoutLine = 0
@@ -31,7 +31,37 @@ const SavedSettings = 1
 
 range SettingsSavedRange = UnsavedSettings..SavedSettings
 
-CHANNEL_EXAMPLE = CHANNEL[WithoutLine][UnsetRate][UnsetVTBI][UnsavedSettings],
+
+
+//=====================
+// Process Definitions
+//=====================
+PUMP = TURNED_OFF,
+
+TURNED_OFF = (turn_on -> TURNED_ON),
+
+TURNED_ON = (self_check -> connect_line -> SETUP | error -> BLOCKED[AlarmActivated]),
+
+SETUP = (confirm_settings -> start_infusion -> START | cancel -> SETUP),
+
+START = (infuse ->  INFUSION), 
+
+INFUSION = (stop_infusion -> TURNED_OFF),
+
+BLOCKED[alarm:AlarmStateT] =
+(
+	turn_off -> TURNED_OFF
+	|
+    when (alarm == AlarmActivated)
+        sound_alarm -> BLOCKED[alarm]
+    |
+    when (alarm == AlarmActivated)
+        silence_alarm -> BLOCKED[AlarmSilenced]
+    |
+    unblock -> TURNED_ON
+).
+
+EMPTY_CHANNEL = CHANNEL[WithoutLine][UnsetRate][UnsetVTBI][UnsavedSettings],
 
 CHANNEL[line:LineConnectedRange][rate:RateSetRange][vtbi:VTBISetRange][settings:SettingsSavedRange] = (
 	when (line == WithoutLine)
@@ -55,3 +85,6 @@ CHANNEL[line:LineConnectedRange][rate:RateSetRange][vtbi:VTBISetRange][settings:
 	when (settings == SavedSettings && line == WithLine)
 		discard_settings -> CHANNEL[line][UnsetRate][UnsetVTBI][UnsavedSettings]
 ).
+
+
+||PUMP_CHANNEL = (PUMP || EMPTY_CHANNEL).
