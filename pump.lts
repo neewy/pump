@@ -10,7 +10,7 @@ range AlarmStateT = AlarmActivated .. AlarmSilenced
 const WithoutLine = 0
 const WithLine = 1
 
-range LineConnectedRange = WithoutLine..WithLine
+range ReadyToOperateRange = WithoutLine..WithLine
 
 // Rate State of Channel
 const UnsetRate = 0
@@ -31,6 +31,17 @@ const SavedSettings = 1
 
 range SettingsSavedRange = UnsavedSettings..SavedSettings
 
+// Blocked State of Line
+const BlockedState = 0
+const UnblockedState = 1
+
+range BlockStateRange = BlockedState..UnblockedState
+
+const NotReadyToOperate = 0
+const ReadyToOperate = 1
+
+range ReadyToOpearateState = NotReadyToOperate..ReadyToOperate
+
 
 
 //=====================
@@ -40,11 +51,15 @@ PUMP = TURNED_OFF,
 
 TURNED_OFF = (turn_on -> TURNED_ON),
 
-TURNED_ON = (self_check -> connect_line -> SETUP | error -> BLOCKED[AlarmActivated]),
+TURNED_ON = (self_check -> SETUP
+			//|
+			//error ->
+			//block_line -> BLOCKED[AlarmActivated]
+			),
 
-SETUP = (confirm_settings -> start_infusion -> START | cancel -> SETUP),
+SETUP = (confirm_saved_lines -> start_infusion -> START | cancel_all_settings -> SETUP),
 
-START = (infuse ->  INFUSION), 
+START = (infuse ->  INFUSION),
 
 INFUSION = (stop_infusion -> TURNED_OFF),
 
@@ -61,30 +76,45 @@ BLOCKED[alarm:AlarmStateT] =
     unblock -> TURNED_ON
 ).
 
-EMPTY_CHANNEL = CHANNEL[WithoutLine][UnsetRate][UnsetVTBI][UnsavedSettings],
+INITIAL_LINE = LINE[NotReadyToOperate][UnblockedState][UnsetRate][UnsetVTBI][UnsavedSettings],
 
-CHANNEL[line:LineConnectedRange][rate:RateSetRange][vtbi:VTBISetRange][settings:SettingsSavedRange] = (
-	when (line == WithoutLine)
-		//we assume that after line connection the settings are discarded by default
-		connect_line -> CHANNEL[WithLine][UnsetRate][UnsetVTBI][UnsavedSettings]
+LINE[ready:ReadyToOpearateState][block:BlockStateRange][rate:RateSetRange][vtbi:VTBISetRange][settings:SettingsSavedRange] = (
+	when (ready == ReadyToOperate && block == UnblockedState && rate == UnsetRate && settings == UnsavedSettings)
+		set_rate -> LINE[ready][block][SetRate][vtbi][settings]
 	|
-	when (line == WithLine)
-		//we assume that after the line is disconnected from the channel
-		//the settings are discarded by default
-		disconnect_line -> CHANNEL[WithoutLine][UnsetRate][UnsetVTBI][UnsavedSettings]
+	when (ready == ReadyToOperate && block == UnblockedState && vtbi == UnsetVTBI && settings == UnsavedSettings)
+		set_vtbi -> LINE[ready][block][rate][SetVTBI][settings]
 	|
-	when (line == WithLine && rate == UnsetRate && settings == UnsavedSettings)
-		set_rate -> CHANNEL[line][SetRate][vtbi][settings]
+	when (ready == ReadyToOperate && block == UnblockedState && rate == SetRate && vtbi == SetVTBI && settings == SavedSettings)
+		confirm_settings -> LINE[ready][block][rate][vtbi][settings]
 	|
-	when (line == WithLine && vtbi == UnsetVTBI && settings == UnsavedSettings)
-		set_vtbi -> CHANNEL[line][rate][SetVTBI][settings]
+	when (ready == ReadyToOperate && block == UnblockedState && rate == SetRate && vtbi == SetVTBI && settings == UnsavedSettings)
+		save_settings -> LINE[ready][block][rate][vtbi][SavedSettings]
 	|
-	when (line == WithLine && rate == SetRate && vtbi == SetVTBI && settings == UnsavedSettings)
-		save_settings -> CHANNEL[line][rate][vtbi][SavedSettings]
+	when (ready == ReadyToOperate && block == UnblockedState && settings == SavedSettings)
+		discard_settings -> LINE[ready][block][UnsetRate][UnsetVTBI][UnsavedSettings]
 	|
-	when (settings == SavedSettings && line == WithLine)
-		discard_settings -> CHANNEL[line][UnsetRate][UnsetVTBI][UnsavedSettings]
+	when (ready == ReadyToOperate && block == BlockedState)
+		unblock_line -> LINE[ready][UnblockedState][UnsetRate][UnsetVTBI][UnsavedSettings]
+	|
+	when (ready == ReadyToOperate & block == UnblockedState)
+		block_line -> LINE[ready][BlockedState][rate][vtbi][settings]
+	|
+	//when (ready == ReadyToOperate)
+		//if settings were set?
+		//if infusion began?
+		//disconnect_line -> LINE[NotReadyToOperate][block][rate][vtbi][settings]
+	//|
+	when (ready == NotReadyToOperate)
+		ready -> LINE[ReadyToOperate][block][rate][vtbi][settings]
+	|
+	when (ready == ReadyToOperate && block == UnblockedState && rate == SetRate && vtbi == SetVTBI && settings == SavedSettings)
+		stop -> LINE[NotReadyToOperate][UnblockedState][UnsetRate][UnsetVTBI][UnsavedSettings]
 ).
 
 
-||PUMP_CHANNEL = (PUMP || EMPTY_CHANNEL).
+||PUMP_CHANNEL(N=2) = (l[i:1..N]:INITIAL_LINE || PUMP)
+			/{self_check/l[1..N].ready,
+				confirm_saved_lines/l[1..N].confirm_settings,
+				cancel_all_settings/l[1..N].discard_settings,
+				stop_infusion/l[1..N].stop}.
