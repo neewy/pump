@@ -125,7 +125,7 @@ LINE[ready:ReadyToOpearateState][block:BlockStateRange][rate:RateSetRange][vtbi:
 		ready -> LINE[ReadyToOperate][block][rate][vtbi][settings]
 	|
 	when (ready == ReadyToOperate && block == UnblockedState && rate == SetRate && vtbi == SetVTBI && settings == SavedSettings)
-		stop -> LINE[NotReadyToOperate][UnblockedState][UnsetRate][UnsetVTBI][UnsavedSettings]
+		stop -> INITIAL_LINE
 	|
 	error -> INITIAL_LINE
 ).
