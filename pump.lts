@@ -157,6 +157,7 @@ LINE[ready:ReadyToOpearateState][block:BlockStateRange][rate:RateSetRange][vtbi:
 	error -> INITIAL_LINE
 ).
 
+// Assume that N is a number of channels to setup!
 ||PUMP_CHANNEL(N=2) = (l[i:1..N]:INITIAL_LINE || PUMP)
 			/{success/l[1..N].ready,
 				confirm_saved_lines/l[1..N].confirm_settings,
