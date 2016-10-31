@@ -1,31 +1,25 @@
 //======================
 // Constants and Ranges
 //======================
+// Alarm State of Pump
 const AlarmActivated = 0    // Alarm currently active
 const AlarmSilenced  = 1    // Alarm currently inactive
 
-range AlarmStateT = AlarmActivated .. AlarmSilenced
+range AlarmStateT = AlarmActivated..AlarmSilenced
 
-// Line State of Channel
-const WithoutLine = 0
-const WithLine = 1
-
-range ReadyToOperateRange = WithoutLine..WithLine
-
-// Rate State of Channel
+// Rate State of Line
 const UnsetRate = 0
 const SetRate = 1
 
 range RateSetRange = UnsetRate..SetRate
 
-
-// VTBI State of Channel
+// VTBI State of Line
 const UnsetVTBI = 0
 const SetVTBI = 1
 
 range VTBISetRange = UnsetVTBI..SetVTBI
 
-// Settings State of Channel
+// Settings State of Line
 const UnsavedSettings = 0
 const SavedSettings = 1
 
@@ -37,12 +31,14 @@ const UnblockedState = 1
 
 range BlockStateRange = BlockedState..UnblockedState
 
+// Ready State of Line
 const NotReadyToOperate = 0
 const ReadyToOperate = 1
 
 range ReadyToOpearateState = NotReadyToOperate..ReadyToOperate
 
-
+// Number of Infusion
+const I = 3
 
 //=====================
 // Process Definitions
@@ -51,17 +47,39 @@ PUMP = TURNED_OFF,
 
 TURNED_OFF = (turn_on -> TURNED_ON),
 
-TURNED_ON = (self_check -> SETUP
-			//|
-			//error ->
-			//block_line -> BLOCKED[AlarmActivated]
-			),
+TURNED_ON = (
+	self_check -> (success -> SETUP | fail -> fix_problems -> TURNED_ON)
+),
 
-SETUP = (confirm_saved_lines -> start_infusion -> START | cancel_all_settings -> SETUP),
+SETUP = (
+	confirm_saved_lines -> (start_infusion -> INFUSION[I] | error -> TURNED_ON)
+	| 
+	cancel_all_settings -> SETUP
+	| 
+	error -> TURNED_ON
+),
 
-START = (infuse ->  INFUSION),
-
-INFUSION = (stop_infusion -> TURNED_OFF),
+INFUSION[n:0..I] = (
+	when(n>0) infuse -> INFUSION[n-1]
+	|	
+	stop_infusion -> (
+		turn_off -> TURNED_OFF 
+		| 
+		resume_infusion -> INFUSION[n]
+		|
+		when(n==0) refill_pump -> SETUP
+		|
+		error -> TURNED_ON
+	)
+	|
+	block_line -> (
+		unblock_line -> INFUSION[n]
+		|
+		error -> TURNED_ON
+	)
+	|
+	error -> TURNED_ON
+),
 
 BLOCKED[alarm:AlarmStateT] =
 (
@@ -95,26 +113,28 @@ LINE[ready:ReadyToOpearateState][block:BlockStateRange][rate:RateSetRange][vtbi:
 		discard_settings -> LINE[ready][block][UnsetRate][UnsetVTBI][UnsavedSettings]
 	|
 	when (ready == ReadyToOperate && block == BlockedState)
-		unblock_line -> LINE[ready][UnblockedState][UnsetRate][UnsetVTBI][UnsavedSettings]
+		unblock_line -> LINE[ready][UnblockedState][rate][vtbi][settings]
+	|
+	when (ready == ReadyToOperate && block == BlockedState)
+		sound_alarm -> LINE[ready][BlockedState][UnsetRate][UnsetVTBI][UnsavedSettings]
 	|
 	when (ready == ReadyToOperate & block == UnblockedState)
 		block_line -> LINE[ready][BlockedState][rate][vtbi][settings]
 	|
-	//when (ready == ReadyToOperate)
-		//if settings were set?
-		//if infusion began?
-		//disconnect_line -> LINE[NotReadyToOperate][block][rate][vtbi][settings]
-	//|
 	when (ready == NotReadyToOperate)
 		ready -> LINE[ReadyToOperate][block][rate][vtbi][settings]
 	|
 	when (ready == ReadyToOperate && block == UnblockedState && rate == SetRate && vtbi == SetVTBI && settings == SavedSettings)
 		stop -> LINE[NotReadyToOperate][UnblockedState][UnsetRate][UnsetVTBI][UnsavedSettings]
+	|
+	error -> INITIAL_LINE
 ).
 
-
 ||PUMP_CHANNEL(N=2) = (l[i:1..N]:INITIAL_LINE || PUMP)
-			/{self_check/l[1..N].ready,
+			/{success/l[1..N].ready,
 				confirm_saved_lines/l[1..N].confirm_settings,
 				cancel_all_settings/l[1..N].discard_settings,
-				stop_infusion/l[1..N].stop}.
+				turn_off/l[1..N].stop,
+				error/l[1..N].error,
+				l[1..N].block_line/block_line,
+				l[1..N].unblock_line/unblock_line}.
