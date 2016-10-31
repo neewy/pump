@@ -1,6 +1,7 @@
 //======================
 // Constants and Ranges
 //======================
+
 // Alarm State of Pump
 const AlarmActivated = 0    // Alarm currently active
 const AlarmSilenced  = 1    // Alarm currently inactive
@@ -8,37 +9,43 @@ const AlarmSilenced  = 1    // Alarm currently inactive
 range AlarmStateT = AlarmActivated..AlarmSilenced
 
 // Rate State of Line
-const UnsetRate = 0
-const SetRate = 1
+const UnsetRate = 0 // Line rate is not set
+const SetRate = 1 	// Line rate is set
 
 range RateSetRange = UnsetRate..SetRate
 
 // VTBI State of Line
-const UnsetVTBI = 0
-const SetVTBI = 1
+const UnsetVTBI = 0	// Line VTBI is not set
+const SetVTBI = 1	// Line VTBI is set
 
 range VTBISetRange = UnsetVTBI..SetVTBI
 
 // Settings State of Line
-const UnsavedSettings = 0
-const SavedSettings = 1
+const UnsavedSettings = 0 // Settings of a line are not saved
+const SavedSettings = 1	  // Settings of a line are saved
 
 range SettingsSavedRange = UnsavedSettings..SavedSettings
 
 // Blocked State of Line
-const BlockedState = 0
-const UnblockedState = 1
+const BlockedState = 0		// Line is blocked
+const UnblockedState = 1	// Line is unblocked
 
 range BlockStateRange = BlockedState..UnblockedState
 
-// Ready State of Line
-const NotReadyToOperate = 0
-const ReadyToOperate = 1
+// Ready State of Line, i.e. it is without air, connected, etc.
+const NotReadyToOperate = 0	// Line is ready to operate 
+const ReadyToOperate = 1	// Line is not ready to operate
 
 range ReadyToOpearateState = NotReadyToOperate..ReadyToOperate
 
-// Number of Infusion
-const I = 3
+// Number of medication boluses
+const VOLUME = 3
+
+// Single dose
+const BOLUS = 1 
+
+// Empty medication set volume
+const EMPTY_SET = 0
 
 //=====================
 // Process Definitions
@@ -48,32 +55,52 @@ PUMP = TURNED_OFF,
 TURNED_OFF = (turn_on -> TURNED_ON),
 
 TURNED_ON = (
-	self_check -> (success -> SETUP | fail -> fix_problems -> TURNED_ON)
+	self_check -> (
+		// if checking went well
+		success -> SETUP 
+		|
+		// else
+	 	fail -> fix_problems -> TURNED_ON
+	)
 ),
 
 SETUP = (
-	confirm_saved_lines -> (start_infusion -> INFUSION[I] | error -> TURNED_ON)
+	// we confirm the settings of all lines
+	confirm_saved_lines -> (
+		// start the infusion
+		start_infusion -> INFUSION[VOLUME] 
+		|
+		// if error - go back to self-check
+		error -> TURNED_ON
+	)
 	| 
 	cancel_all_settings -> SETUP
-	| 
+	|
+ 	// if error - go back to self-check
 	error -> TURNED_ON
 ),
 
-INFUSION[n:0..I] = (
-	when(n>0) infuse -> INFUSION[n-1]
-	|	
+INFUSION[amount:0..VOLUME] = (
+	// when amount is greater than volume of empty set
+	// we infuse single bolus
+	when(amount>EMPTY_SET) infuse -> INFUSION[amount-BOLUS]
+	|
 	stop_infusion -> (
 		turn_off -> TURNED_OFF 
 		| 
-		resume_infusion -> INFUSION[n]
+		resume_infusion -> INFUSION[amount]
 		|
-		when(n==0) refill_pump -> SETUP
+		// when empty - refill the pump
+		when(amount==EMPTY_SET) refill_pump -> SETUP
 		|
 		error -> TURNED_ON
 	)
 	|
+	// during infusion a line can be blocked
 	block_line -> (
-		unblock_line -> INFUSION[n]
+		// mitigation is to unblock it
+		// and continue with infusion
+		unblock_line -> INFUSION[amount]
 		|
 		error -> TURNED_ON
 	)
