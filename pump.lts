@@ -108,9 +108,17 @@ INFUSION[amount:0..VOLUME] = (
 	error -> TURNED_ON
 ).
 
+
+// initially, line is not ready to operate (i.e. not connected, etc.)
+// it is unblocked,
+// rate and vtbi are not set,
+// settings are not saved
 INITIAL_LINE = LINE[NotReadyToOperate][UnblockedState][UnsetRate][UnsetVTBI][UnsavedSettings],
 
 LINE[ready:ReadyToOpearateState][block:BlockStateRange][rate:RateSetRange][vtbi:VTBISetRange][settings:SettingsSavedRange] = (
+	when (ready == NotReadyToOperate)
+		ready -> LINE[ReadyToOperate][block][rate][vtbi][settings]
+	|
 	when (ready == ReadyToOperate && block == UnblockedState && rate == UnsetRate && settings == UnsavedSettings)
 		set_rate -> LINE[ready][block][SetRate][vtbi][settings]
 	|
@@ -135,9 +143,6 @@ LINE[ready:ReadyToOpearateState][block:BlockStateRange][rate:RateSetRange][vtbi:
 	when (ready == ReadyToOperate & block == UnblockedState)
 		block_line -> LINE[ready][BlockedState][rate][vtbi][settings]
 	|
-	when (ready == NotReadyToOperate)
-		ready -> LINE[ReadyToOperate][block][rate][vtbi][settings]
-	|
 	when (ready == ReadyToOperate && block == UnblockedState && rate == SetRate && vtbi == SetVTBI && settings == SavedSettings)
 		stop -> INITIAL_LINE
 	|
@@ -146,10 +151,12 @@ LINE[ready:ReadyToOpearateState][block:BlockStateRange][rate:RateSetRange][vtbi:
 
 // Assume that N is a number of channels to setup!
 ||PUMP_CHANNEL(N=2) = (l[i:1..N]:INITIAL_LINE || PUMP)
-			/{success/l[1..N].ready,
-				confirm_saved_lines/l[1..N].confirm_settings,
-				cancel_all_settings/l[1..N].discard_settings,
-				turn_off/l[1..N].stop,
-				error/l[1..N].error,
-				l[1..N].block_line/block_line,
-				l[1..N].unblock_line/unblock_line}.
+			/{success/l[1..N].ready, //if the self-check is fine - lines are ready to operate
+				//as we set all the lines and saved the settings
+				confirm_saved_lines/l[1..N].confirm_settings, // we can confirm them
+				cancel_all_settings/l[1..N].discard_settings, // or cancel
+				turn_off/l[1..N].stop, //if we turn off the pump - the lines are stopped
+				// if the error occured - the line is not ready to operate
+				error/l[1..N].error, // and settings are discarded
+				l[1..N].block_line/block_line, //blocking any line will result in either error
+				l[1..N].unblock_line/unblock_line}. //or line unblocking
