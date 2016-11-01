@@ -106,19 +106,6 @@ INFUSION[amount:0..VOLUME] = (
 	)
 	|
 	error -> TURNED_ON
-),
-
-BLOCKED[alarm:AlarmStateT] =
-(
-	turn_off -> TURNED_OFF
-	|
-    when (alarm == AlarmActivated)
-        sound_alarm -> BLOCKED[alarm]
-    |
-    when (alarm == AlarmActivated)
-        silence_alarm -> BLOCKED[AlarmSilenced]
-    |
-    unblock -> TURNED_ON
 ).
 
 INITIAL_LINE = LINE[NotReadyToOperate][UnblockedState][UnsetRate][UnsetVTBI][UnsavedSettings],
