@@ -269,7 +269,7 @@ LINE[ready:ReadyToOpearateState][block:BlockStateRange][rate:RateSetRange][vtbi:
 		unblock_line -> LINE[ready][UnblockedState][rate][vtbi][settings]
 	|
 	when (ready == ReadyToOperate && block == BlockedState)
-		sound_alarm -> LINE[ready][BlockedState][UnsetRate][UnsetVTBI][UnsavedSettings]
+		sound_alarm -> LINE[ready][BlockedState][rate][vtbi][settings]
 	|
 	when (ready == ReadyToOperate & block == UnblockedState)
 		block_line -> LINE[ready][BlockedState][rate][vtbi][settings]
