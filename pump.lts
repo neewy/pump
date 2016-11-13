@@ -74,68 +74,104 @@ const EMPTY_SET = 0
 //=====================
 // Process Definitions
 //=====================
-PUMP = TURNED_OFF,
 
-TURNED_OFF = (
-	turn_on -> CHECKING_ELECTRICITY[FirstLaunchTrue]
-),
+//~~~~~~~~~~~~~~~
+// POWER SYSTEM
+//~~~~~~~~~~~~~~~
+
+// BATTERY
+POWER_BATTERY = BATTERY_OFF,
+// activate battery by turn on action 
+BATTERY_OFF = (turn_on_battery -> BATTERY_ON),
+// deactivate battery by turn off action
+BATTERY_ON = (turn_off_battery -> BATTERY_OFF).
+
+// ELECTRICITY
+POWER_ELECTRICITY = ELECTRICITY_OFF,
+// activate electricity by turn on action 
+ELECTRICITY_OFF = (turn_on_electricity -> ELECTRICITY_ON),
+// deactivate electricity by turn off action 
+ELECTRICITY_ON = (turn_off_electricity -> ELECTRICITY_OFF).
+
+
+//~~~~~~~~~~~~~~~
+// ALARM SYSTEM
+//~~~~~~~~~~~~~~~
+ALARM = TURNED_OFF,
+// activate alarm by sound action 
+TURNED_OFF = (sound -> TURNED_ON),
+// continue to alarm by sound action, or deactivate alarm by silent action 
+TURNED_ON = (sound -> TURNED_ON | silent -> TURNED_OFF).
+
+
+//~~~~~~~~~~~~~~~
+// PUMP INTERFACE
+//~~~~~~~~~~~~~~~
+PUMP = TURNED_OFF,
+// go to check electricity after turn on action
+TURNED_OFF = (turn_on -> CHECKING_ELECTRICITY[FirstLaunchTrue]),
 
 TURNED_ON = (
 	self_check -> (
 		// if checking went well
 		success -> SETUP 
 		|
-		// else
+		// if checking failed
 	 	fail -> fix_problems -> TURNED_ON
 		|
+		// power failure
 		power_outage -> CHECKING_ELECTRICITY[FirstLaunchTrue]
 		|
+		// ability to turn off the pump
 		turn_off -> TURNED_OFF
 	)
 	|
+	// power failure
 	power_outage -> CHECKING_ELECTRICITY[FirstLaunchTrue]
 	|
+	// ability to turn off the pump
 	turn_off -> TURNED_OFF
 ),
 
+// Checking electrical power state
 CHECKING_ELECTRICITY[state: FirstLaunchStateT] = (
+	// if it is a first launch of the pump, turn on the pump or change powered by electricity state 
 	when(state == FirstLaunchTrue)
-		check_electricity -> TURNED_ON
-		|
-		check_electricity -> POWERED_BY_ELECTRICITY[ElectricityOff][FirstLaunchTrue]
+		check_electricity -> (electricity_on -> TURNED_ON |	electricity_off -> POWERED_BY_ELECTRICITY[ElectricityOff][FirstLaunchTrue])
 	|
+	// if it is not a first launch of the pump, go to setup state or change powered by electricity state
 	when(state == FirstLaunchFalse)
-		check_electricity -> SETUP
-		|
-		check_electricity -> POWERED_BY_ELECTRICITY[ElectricityOff][FirstLaunchFalse]
+		check_electricity -> (electricity_on -> SETUP | electricity_off -> POWERED_BY_ELECTRICITY[ElectricityOff][FirstLaunchFalse])
 	|
+	// ability to turn off the pump
 	turn_off -> TURNED_OFF
 ),
 
-POWERED_BY_BATTERY[state:BatteryStateT][launch:FirstLaunchStateT] = 
-(
-	when (state == BatteryCharged)
-		turn_on_battery -> TURNED_ON
+// Powered by battery state
+POWERED_BY_BATTERY[state:BatteryStateT][launch:FirstLaunchStateT] = (	
+	// if battery is charged, turn on the battery as a power source
+	when (state == BatteryCharged) 
+		battery_on -> TURNED_ON
 	|
+	// if battery is uncharged, change battery or go to check electricity
 	when (state == BatteryUncharged)
-		change_battery -> POWERED_BY_BATTERY[BatteryCharged][launch]
+		battery_off -> (change_battery -> POWERED_BY_BATTERY[BatteryCharged][launch] | go_to_check_electricity -> CHECKING_ELECTRICITY[launch])
 	|
-	when (state == BatteryUncharged)
-		go_to_check_electricity -> CHECKING_ELECTRICITY[launch]
-	|
+	// ability to turn off the pump
 	turn_off -> TURNED_OFF
 ),
 
+// Powered by electricity state
 POWERED_BY_ELECTRICITY[state:ElectricityStateT][launch:FirstLaunchStateT] = (
+	// if there is an electricity, turn on the pump
 	when (state == ElectricityOn)
-		turn_on -> TURNED_ON
+		electricity_on -> TURNED_ON
 	|
+	// if there is no an electricity, switch on the charged or uncharged battery and go to powered by battery state
 	when (state == ElectricityOff)
-		switch_on_battery -> POWERED_BY_BATTERY[BatteryCharged][launch]
+		switch_on_battery -> (battery_charged -> POWERED_BY_BATTERY[BatteryCharged][launch] | battery_uncharged -> POWERED_BY_BATTERY[BatteryUncharged][launch])
 	| 
-	when (state == ElectricityOff)	
-		switch_on_battery -> POWERED_BY_BATTERY[BatteryUncharged][launch]
-	|
+	// ability to turn off the pump
 	turn_off -> TURNED_OFF
 ),
 
@@ -148,6 +184,7 @@ SETUP = (
 		// if error - go back to self-check
 		error -> TURNED_ON
 		|
+		// power failure
 		power_outage -> CHECKING_ELECTRICITY[FirstLaunchFalse]
 	)
 	| 
@@ -156,8 +193,10 @@ SETUP = (
  	// if error - go back to self-check
 	error -> TURNED_ON
 	|
+	// power failure
 	power_outage -> CHECKING_ELECTRICITY[FirstLaunchFalse]
 	|
+	// ability to turn off the pump
 	turn_off -> TURNED_OFF
 ),
 
@@ -176,6 +215,7 @@ INFUSION[amount:0..VOLUME] = (
 		|
 		error -> TURNED_ON
 		|
+		// power failure
 		power_outage -> CHECKING_ELECTRICITY[FirstLaunchFalse]
 	)
 	|
@@ -192,10 +232,14 @@ INFUSION[amount:0..VOLUME] = (
 	|
 	error -> TURNED_ON
 	| 
+	// power failure
 	power_outage -> CHECKING_ELECTRICITY[FirstLaunchFalse]
 ).
 
 
+//~~~~~~~~~~~~~~~
+// LINES
+//~~~~~~~~~~~~~~~
 // initially, line is not ready to operate (i.e. not connected, etc.)
 // it is unblocked,
 // rate and vtbi are not set,
@@ -237,7 +281,7 @@ LINE[ready:ReadyToOpearateState][block:BlockStateRange][rate:RateSetRange][vtbi:
 ).
 
 // Assume that N is a number of channels to setup!
-||PUMP_CHANNEL(N=2) = (l[i:1..N]:INITIAL_LINE || PUMP)
+||PUMP_CHANNEL(N=2) = (l[i:1..N]:INITIAL_LINE || PUMP || POWER_BATTERY || POWER_ELECTRICITY || ALARM)
 			/{success/l[1..N].ready, //if the self-check is fine - lines are ready to operate
 				//as we set all the lines and saved the settings
 				confirm_saved_lines/l[1..N].confirm_settings, // we can confirm them
@@ -247,4 +291,10 @@ LINE[ready:ReadyToOpearateState][block:BlockStateRange][rate:RateSetRange][vtbi:
 				error/l[1..N].error, // and settings are discarded
 				l[1..N].block_line/block_line, //blocking any line will result in either error
 				l[1..N].unblock_line/unblock_line,
-				power_outage/l[1..N].error}. //or line unblocking
+				power_outage/l[1..N].error, //or line unblocking
+				electricity_on/turn_on_electricity,
+				electricity_off/turn_off_electricity,
+				battery_on/turn_on_battery,
+				battery_off/turn_off_battery,
+				l[1..N].sound_alarm/sound,
+				l[1..N].unblock_line/silent}.
