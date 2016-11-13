@@ -107,7 +107,7 @@ TURNED_ON = (sound -> TURNED_ON | silent -> TURNED_OFF).
 //~~~~~~~~~~~~~~~
 // PUMP INTERFACE
 //~~~~~~~~~~~~~~~
-PUMP = TURNED_OFF,
+PUMP_UI = TURNED_OFF,
 // go to check electricity after turn on action
 TURNED_OFF = (turn_on -> CHECKING_ELECTRICITY[FirstLaunchTrue]),
 
@@ -281,7 +281,7 @@ LINE[ready:ReadyToOpearateState][block:BlockStateRange][rate:RateSetRange][vtbi:
 ).
 
 // Assume that N is a number of channels to setup!
-||PUMP_CHANNEL(N=2) = (l[i:1..N]:INITIAL_LINE || PUMP || POWER_BATTERY || POWER_ELECTRICITY || ALARM)
+||PUMP(N=2) = (l[i:1..N]:INITIAL_LINE || PUMP_UI || POWER_BATTERY || POWER_ELECTRICITY || ALARM)
 			/{success/l[1..N].ready, //if the self-check is fine - lines are ready to operate
 				//as we set all the lines and saved the settings
 				confirm_saved_lines/l[1..N].confirm_settings, // we can confirm them
