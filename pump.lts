@@ -292,11 +292,11 @@ LINE[ready:ReadyToOpearateState][block:BlockStateRange][rate:RateSetRange][vtbi:
 				l[1..N].block_line/block_line, //blocking any line will result in either error
 				l[1..N].unblock_line/unblock_line,
 				power_outage/l[1..N].error, //or line unblocking
-				electricity_on/turn_on_electricity,
-				switch_on_battery/turn_off_electricity,
-				battery_on/turn_on_battery,
-				battery_off/turn_off_battery,
-				l[1..N].sound_alarm/sound,
-				l[1..N].unblock_line/silent,
-				turn_off/turn_off_electricity,
+				electricity_on/turn_on_electricity, // if we select electricity as a power source, turn it on
+				switch_on_battery/turn_off_electricity, // if we select to switch on battery as a power source, turn electricity off
+				battery_on/turn_on_battery, // in pump ui battery_on action is shared with turn_on_battery inside POWER_BATTERY
+				battery_off/turn_off_battery, // in pump ui battery_off action is shared with turn_off_battery inside POWER_BATTERY
+				l[1..N].sound_alarm/sound, // alarming line will result the alarm system to sound 
+				l[1..N].unblock_line/silent, // unblocking line will result the alarm system to silent
+				turn_off/turn_off_electricity, // when turn off the pump, we turn off all power sources 
 				turn_off/turn_off_battery}.
