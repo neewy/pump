@@ -300,3 +300,58 @@ LINE[ready:ReadyToOpearateState][block:BlockStateRange][rate:RateSetRange][vtbi:
 				l[1..N].unblock_line/silent, // unblocking line will result the alarm system to silent
 				turn_off/turn_off_electricity, // when turn off the pump, we turn off all power sources 
 				turn_off/turn_off_battery}.
+
+
+fluent SETTINGS_CONFIRMED = <
+	{confirm_saved_lines}, // TRUE when confirmed
+	{start_infusion, error, power_outage} // FALSE right after any other action was performed
+>
+
+assert INFUSION_AFTER_CONFIRM = (
+	(SETTINGS_CONFIRMED -> X start_infusion) // if settings were confirmed then the next action is start_infusion
+	&&
+	(!SETTINGS_CONFIRMED -> X !start_infusion) // if settings were not confirmed we cannot start_infusion
+)
+
+
+fluent FAILURE_NOT_AVAILABLE = <
+	{power_outage, turn_on, //TRUE if power_outage not available
+		check_electricity}, 
+	{electricity_on, battery_on} //FALSE if power_outage is available
+> 
+
+assert FAILURE_AVAILABLE_ASSERT = (
+	(FAILURE_NOT_AVAILABLE -> <>power_outage) 
+	&& 
+	([]power_outage -> !FAILURE_NOT_AVAILABLE)
+)
+
+
+fluent BACKUP_BATTERY = <
+	{battery_off},  //TRUE if battery fails
+	{electricity_on} 
+> 
+
+assert BACKUP_BATTERY_ASSERT = (
+	(BACKUP_BATTERY -> <>start_infusion) 
+	&& 
+	([]start_infusion -> !BACKUP_BATTERY)
+)
+
+assert POSSIBLE_RESUME = ([](error -> <>infuse) || [](power_outage -> <>infuse))
+
+
+fluent SOUND_ALARM = <{block_line}, {unblock_line}> 
+
+assert SOUND_ALARM_ASSERT = (
+	(SOUND_ALARM -> <>sound_alarm) 
+	&& 
+	([]sound_alarm -> !SOUND_ALARM)
+)
+
+
+assert TREATEMENT_IS_FINISHED = [](start_infusion -> <>stop_infusion)
+
+assert CANCEL_SETTINGS = [](self_check -> <>cancel_all_settings)
+
+assert REFILL = [](start_infusion -> <>refill_pump)
