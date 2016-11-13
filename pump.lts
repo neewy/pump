@@ -82,16 +82,16 @@ const EMPTY_SET = 0
 // BATTERY
 POWER_BATTERY = BATTERY_OFF,
 // activate battery by turn on action 
-BATTERY_OFF = (turn_off_battery -> BATTERY_OFF | turn_on_battery -> BATTERY_ON),
+BATTERY_OFF = (turn_on_battery -> BATTERY_ON | turn_off_battery -> BATTERY_OFF),
 // deactivate battery by turn off action
-BATTERY_ON = (turn_on_battery -> BATTERY_ON | turn_off_battery -> BATTERY_OFF).
+BATTERY_ON = (turn_off_battery -> BATTERY_OFF | turn_on_battery -> BATTERY_ON).
 
 // ELECTRICITY
 POWER_ELECTRICITY = ELECTRICITY_OFF,
 // activate electricity by turn on action 
-ELECTRICITY_OFF = (turn_off_electricity -> ELECTRICITY_OFF | turn_on_electricity -> ELECTRICITY_ON),
+ELECTRICITY_OFF = (turn_on_electricity -> ELECTRICITY_ON | turn_off_electricity -> ELECTRICITY_OFF),
 // deactivate electricity by turn off action 
-ELECTRICITY_ON = (turn_on_electricity -> ELECTRICITY_ON | turn_off_electricity -> ELECTRICITY_OFF).
+ELECTRICITY_ON = (turn_off_electricity -> ELECTRICITY_OFF | turn_on_electricity -> ELECTRICITY_ON).
 
 
 //~~~~~~~~~~~~~~~
@@ -137,11 +137,11 @@ TURNED_ON = (
 CHECKING_ELECTRICITY[state: FirstLaunchStateT] = (
 	// if it is a first launch of the pump, turn on the pump or change powered by electricity state 
 	when(state == FirstLaunchTrue)
-		check_electricity -> (electricity_on -> TURNED_ON |	electricity_off -> POWERED_BY_ELECTRICITY[ElectricityOff][FirstLaunchTrue])
+		check_electricity -> (electricity_was_found -> TURNED_ON |	electricity_was_lost -> POWERED_BY_ELECTRICITY[ElectricityOff][FirstLaunchTrue])
 	|
 	// if it is not a first launch of the pump, go to setup state or change powered by electricity state
 	when(state == FirstLaunchFalse)
-		check_electricity -> (electricity_on -> SETUP | electricity_off -> POWERED_BY_ELECTRICITY[ElectricityOff][FirstLaunchFalse])
+		check_electricity -> (electricity_was_found -> SETUP | electricity_was_lost -> POWERED_BY_ELECTRICITY[ElectricityOff][FirstLaunchFalse])
 	|
 	// ability to turn off the pump
 	turn_off -> TURNED_OFF
@@ -169,7 +169,7 @@ POWERED_BY_ELECTRICITY[state:ElectricityStateT][launch:FirstLaunchStateT] = (
 	|
 	// if there is no an electricity, switch on the charged or uncharged battery and go to powered by battery state
 	when (state == ElectricityOff)
-		switch_on_battery -> (battery_charged -> POWERED_BY_BATTERY[BatteryCharged][launch] | battery_uncharged -> POWERED_BY_BATTERY[BatteryUncharged][launch])
+		 switch_on_battery -> (battery_charged -> POWERED_BY_BATTERY[BatteryCharged][launch] | battery_uncharged -> POWERED_BY_BATTERY[BatteryUncharged][launch])
 	| 
 	// ability to turn off the pump
 	turn_off -> TURNED_OFF
@@ -293,8 +293,10 @@ LINE[ready:ReadyToOpearateState][block:BlockStateRange][rate:RateSetRange][vtbi:
 				l[1..N].unblock_line/unblock_line,
 				power_outage/l[1..N].error, //or line unblocking
 				electricity_on/turn_on_electricity,
-				electricity_off/turn_off_electricity,
+				switch_on_battery/turn_off_electricity,
 				battery_on/turn_on_battery,
 				battery_off/turn_off_battery,
 				l[1..N].sound_alarm/sound,
-				l[1..N].unblock_line/silent}.
+				l[1..N].unblock_line/silent,
+				turn_off/turn_off_electricity,
+				turn_off/turn_off_battery}.
