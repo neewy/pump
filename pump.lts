@@ -81,159 +81,202 @@ const EMPTY_SET = 0
 
 // BATTERY
 POWER_BATTERY = BATTERY_OFF,
+
 // activate battery by turn on action 
-BATTERY_OFF = (turn_on_battery -> BATTERY_ON | turn_off_battery -> BATTERY_OFF),
+BATTERY_OFF = (
+    turn_on_battery -> BATTERY_ON 
+    | 
+    turn_off_battery -> BATTERY_OFF
+),
+
 // deactivate battery by turn off action
-BATTERY_ON = (turn_off_battery -> BATTERY_OFF | turn_on_battery -> BATTERY_ON).
+BATTERY_ON = (
+    turn_off_battery -> BATTERY_OFF 
+    | 
+    turn_on_battery -> BATTERY_ON
+).
 
 // ELECTRICITY
 POWER_ELECTRICITY = ELECTRICITY_OFF,
+
 // activate electricity by turn on action 
-ELECTRICITY_OFF = (turn_on_electricity -> ELECTRICITY_ON | turn_off_electricity -> ELECTRICITY_OFF),
+ELECTRICITY_OFF = (
+    turn_on_electricity -> ELECTRICITY_ON 
+    | 
+    turn_off_electricity -> ELECTRICITY_OFF
+),
+
 // deactivate electricity by turn off action 
-ELECTRICITY_ON = (turn_off_electricity -> ELECTRICITY_OFF | turn_on_electricity -> ELECTRICITY_ON).
+ELECTRICITY_ON = (
+    turn_off_electricity -> ELECTRICITY_OFF 
+    | 
+    turn_on_electricity -> ELECTRICITY_ON
+).
 
 
 //~~~~~~~~~~~~~~~
 // ALARM SYSTEM
 //~~~~~~~~~~~~~~~
 ALARM = TURNED_OFF,
+
 // activate alarm by sound action 
 TURNED_OFF = (sound -> TURNED_ON),
+
 // continue to alarm by sound action, or deactivate alarm by silent action 
-TURNED_ON = (sound -> TURNED_ON | silent -> TURNED_OFF).
+TURNED_ON = (
+    sound -> TURNED_ON 
+    | 
+    silent -> TURNED_OFF
+).
 
 
 //~~~~~~~~~~~~~~~
 // PUMP INTERFACE
 //~~~~~~~~~~~~~~~
 PUMP_UI = TURNED_OFF,
+
 // go to check electricity after turn on action
 TURNED_OFF = (turn_on -> CHECKING_ELECTRICITY[FirstLaunchTrue]),
 
 TURNED_ON = (
-	self_check -> (
-		// if checking went well
-		success -> SETUP 
-		|
-		// if checking failed
-	 	fail -> fix_problems -> TURNED_ON
-		|
-		// power failure
-		power_outage -> CHECKING_ELECTRICITY[FirstLaunchTrue]
-		|
-		// ability to turn off the pump
-		turn_off -> TURNED_OFF
-	)
-	|
-	// power failure
-	power_outage -> CHECKING_ELECTRICITY[FirstLaunchTrue]
-	|
-	// ability to turn off the pump
-	turn_off -> TURNED_OFF
+    self_check -> (
+        // if checking went well
+        success -> SETUP 
+        |
+        // if checking failed
+        fail -> fix_problems -> TURNED_ON
+        |
+        // power failure
+        power_outage -> CHECKING_ELECTRICITY[FirstLaunchTrue]
+        |
+        // ability to turn off the pump
+        turn_off -> TURNED_OFF
+    )
+    |
+    // power failure
+    power_outage -> CHECKING_ELECTRICITY[FirstLaunchTrue]
+    |
+    // ability to turn off the pump
+    turn_off -> TURNED_OFF
 ),
 
 // Checking electrical power state
 CHECKING_ELECTRICITY[state: FirstLaunchStateT] = (
-	// if it is a first launch of the pump, turn on the pump or change powered by electricity state 
-	when(state == FirstLaunchTrue)
-		check_electricity -> (electricity_was_found -> TURNED_ON |	electricity_was_lost -> POWERED_BY_ELECTRICITY[ElectricityOff][FirstLaunchTrue])
-	|
-	// if it is not a first launch of the pump, go to setup state or change powered by electricity state
-	when(state == FirstLaunchFalse)
-		check_electricity -> (electricity_was_found -> SETUP | electricity_was_lost -> POWERED_BY_ELECTRICITY[ElectricityOff][FirstLaunchFalse])
-	|
-	// ability to turn off the pump
-	turn_off -> TURNED_OFF
+    // if it is a first launch of the pump, turn on the pump or change powered by electricity state 
+    when(state == FirstLaunchTrue)
+        check_electricity -> (
+            electricity_was_found -> TURNED_ON 
+            |	
+            electricity_was_lost -> POWERED_BY_ELECTRICITY[ElectricityOff][FirstLaunchTrue]
+        )
+    |
+    // if it is not a first launch of the pump, go to setup state or change powered by electricity state
+    when(state == FirstLaunchFalse)
+        check_electricity -> (
+            electricity_was_found -> SETUP 
+            | 
+            electricity_was_lost -> POWERED_BY_ELECTRICITY[ElectricityOff][FirstLaunchFalse]
+        )
+    |
+    // ability to turn off the pump
+    turn_off -> TURNED_OFF
 ),
 
 // Powered by battery state
 POWERED_BY_BATTERY[state:BatteryStateT][launch:FirstLaunchStateT] = (	
-	// if battery is charged, turn on the battery as a power source
-	when (state == BatteryCharged) 
-		battery_on -> TURNED_ON
-	|
-	// if battery is uncharged, change battery or go to check electricity
-	when (state == BatteryUncharged)
-		battery_off -> (change_battery -> POWERED_BY_BATTERY[BatteryCharged][launch] | go_to_check_electricity -> CHECKING_ELECTRICITY[launch])
-	|
-	// ability to turn off the pump
-	turn_off -> TURNED_OFF
+    // if battery is charged, turn on the battery as a power source
+    when (state == BatteryCharged) 
+        battery_on -> TURNED_ON
+    |
+    // if battery is uncharged, change battery or go to check electricity
+    when (state == BatteryUncharged)
+        battery_off -> (
+            change_battery -> POWERED_BY_BATTERY[BatteryCharged][launch] 
+            | 
+            go_to_check_electricity -> CHECKING_ELECTRICITY[launch]
+        )
+    |
+    // ability to turn off the pump
+    turn_off -> TURNED_OFF
 ),
 
 // Powered by electricity state
 POWERED_BY_ELECTRICITY[state:ElectricityStateT][launch:FirstLaunchStateT] = (
-	// if there is an electricity, turn on the pump
-	when (state == ElectricityOn)
-		electricity_on -> TURNED_ON
-	|
-	// if there is no an electricity, switch on the charged or uncharged battery and go to powered by battery state
-	when (state == ElectricityOff)
-		 switch_on_battery -> (battery_charged -> POWERED_BY_BATTERY[BatteryCharged][launch] | battery_uncharged -> POWERED_BY_BATTERY[BatteryUncharged][launch])
-	| 
-	// ability to turn off the pump
-	turn_off -> TURNED_OFF
+    // if there is an electricity, turn on the pump
+    when (state == ElectricityOn)
+        electricity_on -> TURNED_ON
+    |
+    // if there is no an electricity, switch on the charged or uncharged battery and go to powered by battery state
+    when (state == ElectricityOff)
+        switch_on_battery -> (
+            battery_charged -> POWERED_BY_BATTERY[BatteryCharged][launch] 
+            | 
+            battery_uncharged -> POWERED_BY_BATTERY[BatteryUncharged][launch]
+        )
+    | 
+    // ability to turn off the pump
+    turn_off -> TURNED_OFF
 ),
 
 SETUP = (
-	// we confirm the settings of all lines
-	confirm_saved_lines -> (
-		// start the infusion
-		start_infusion -> INFUSION[VOLUME] 
-		|
-		// if error - go back to self-check
-		error -> TURNED_ON
-		|
-		// power failure
-		power_outage -> CHECKING_ELECTRICITY[FirstLaunchFalse]
-	)
-	| 
-	cancel_all_settings -> SETUP
-	|
- 	// if error - go back to self-check
-	error -> TURNED_ON
-	|
-	// power failure
-	power_outage -> CHECKING_ELECTRICITY[FirstLaunchFalse]
-	|
-	// ability to turn off the pump
-	turn_off -> TURNED_OFF
+    // we confirm the settings of all lines
+    confirm_saved_lines -> (
+        // start the infusion
+        start_infusion -> INFUSION[VOLUME] 
+        |
+        // if error - go back to self-check
+        error -> TURNED_ON
+        |
+        // power failure
+        power_outage -> CHECKING_ELECTRICITY[FirstLaunchFalse]
+    )
+    | 
+    cancel_all_settings -> SETUP
+    |
+    // if error - go back to self-check
+    error -> TURNED_ON
+    |
+    // power failure
+    power_outage -> CHECKING_ELECTRICITY[FirstLaunchFalse]
+    |
+    // ability to turn off the pump
+    turn_off -> TURNED_OFF
 ),
 
 INFUSION[amount:0..VOLUME] = (
-	// when amount is greater than volume of empty set
-	// we infuse single bolus
-	when(amount>EMPTY_SET) infuse -> INFUSION[amount-BOLUS]
-	|
-	stop_infusion -> (
-		stop_pump -> turn_off -> TURNED_OFF 
-		| 
-		resume_infusion -> INFUSION[amount]
-		|
-		// when empty - refill the pump
-		when(amount==EMPTY_SET) refill_pump -> SETUP
-		|
-		error -> TURNED_ON
-		|
-		// power failure
-		power_outage -> CHECKING_ELECTRICITY[FirstLaunchFalse]
-	)
-	|
-	// during infusion a line can be blocked
-	block_line -> (
-		// mitigation is to unblock it
-		// and continue with infusion
-		unblock_line -> INFUSION[amount]
-		|
-		error -> TURNED_ON
-		|
-		power_outage -> CHECKING_ELECTRICITY[FirstLaunchFalse]
-	)
-	|
-	error -> TURNED_ON
-	| 
-	// power failure
-	power_outage -> CHECKING_ELECTRICITY[FirstLaunchFalse]
+    // when amount is greater than volume of empty set
+    // we infuse single bolus
+    when(amount>EMPTY_SET) infuse -> INFUSION[amount-BOLUS]
+    |
+    stop_infusion -> (
+        stop_pump -> turn_off -> TURNED_OFF 
+        | 
+        resume_infusion -> INFUSION[amount]
+        |
+        // when empty - refill the pump
+        when(amount==EMPTY_SET) refill_pump -> SETUP
+        |
+        error -> TURNED_ON
+        |
+        // power failure
+        power_outage -> CHECKING_ELECTRICITY[FirstLaunchFalse]
+    )
+    |
+    // during infusion a line can be blocked
+    block_line -> (
+        // mitigation is to unblock it
+        // and continue with infusion
+        unblock_line -> INFUSION[amount]
+        |
+        error -> TURNED_ON
+        |
+        power_outage -> CHECKING_ELECTRICITY[FirstLaunchFalse]
+    )
+    |
+    error -> TURNED_ON
+    | 
+    // power failure
+    power_outage -> CHECKING_ELECTRICITY[FirstLaunchFalse]
 ).
 
 
@@ -247,95 +290,95 @@ INFUSION[amount:0..VOLUME] = (
 INITIAL_LINE = LINE[NotReadyToOperate][UnblockedState][UnsetRate][UnsetVTBI][UnsavedSettings],
 
 LINE[ready:ReadyToOpearateState][block:BlockStateRange][rate:RateSetRange][vtbi:VTBISetRange][settings:SettingsSavedRange] = (
-	when (ready == NotReadyToOperate)
-		ready -> LINE[ReadyToOperate][block][rate][vtbi][settings]
-	|
-	when (ready == ReadyToOperate && block == UnblockedState && rate == UnsetRate && settings == UnsavedSettings)
-		set_rate -> LINE[ready][block][SetRate][vtbi][settings]
-	|
-	when (ready == ReadyToOperate && block == UnblockedState && vtbi == UnsetVTBI && settings == UnsavedSettings)
-		set_vtbi -> LINE[ready][block][rate][SetVTBI][settings]
-	|
-	when (ready == ReadyToOperate && block == UnblockedState && rate == SetRate && vtbi == SetVTBI && settings == SavedSettings)
-		confirm_settings -> LINE[ready][block][rate][vtbi][settings]
-	|
-	when (ready == ReadyToOperate && block == UnblockedState && rate == SetRate && vtbi == SetVTBI && settings == UnsavedSettings)
-		save_settings -> LINE[ready][block][rate][vtbi][SavedSettings]
-	|
-	when (ready == ReadyToOperate && block == UnblockedState && settings == SavedSettings)
-		discard_settings -> LINE[ready][block][UnsetRate][UnsetVTBI][UnsavedSettings]
-	|
-	when (ready == ReadyToOperate && block == BlockedState)
-		unblock_line -> LINE[ready][UnblockedState][rate][vtbi][settings]
-	|
-	when (ready == ReadyToOperate && block == BlockedState)
-		sound_alarm -> LINE[ready][BlockedState][rate][vtbi][settings]
-	|
-	when (ready == ReadyToOperate & block == UnblockedState)
-		block_line -> LINE[ready][BlockedState][rate][vtbi][settings]
-	|
-	when (ready == ReadyToOperate && block == UnblockedState && rate == SetRate && vtbi == SetVTBI && settings == SavedSettings)
-		stop -> INITIAL_LINE
-	|
-	error -> INITIAL_LINE
+    when (ready == NotReadyToOperate)
+        ready -> LINE[ReadyToOperate][block][rate][vtbi][settings]
+    |
+    when (ready == ReadyToOperate && block == UnblockedState && rate == UnsetRate && settings == UnsavedSettings)
+        set_rate -> LINE[ready][block][SetRate][vtbi][settings]
+    |
+    when (ready == ReadyToOperate && block == UnblockedState && vtbi == UnsetVTBI && settings == UnsavedSettings)
+        set_vtbi -> LINE[ready][block][rate][SetVTBI][settings]
+    |
+    when (ready == ReadyToOperate && block == UnblockedState && rate == SetRate && vtbi == SetVTBI && settings == SavedSettings)
+        confirm_settings -> LINE[ready][block][rate][vtbi][settings]
+    |
+    when (ready == ReadyToOperate && block == UnblockedState && rate == SetRate && vtbi == SetVTBI && settings == UnsavedSettings)
+        save_settings -> LINE[ready][block][rate][vtbi][SavedSettings]
+    |
+    when (ready == ReadyToOperate && block == UnblockedState && settings == SavedSettings)
+        discard_settings -> LINE[ready][block][UnsetRate][UnsetVTBI][UnsavedSettings]
+    |
+    when (ready == ReadyToOperate && block == BlockedState)
+        unblock_line -> LINE[ready][UnblockedState][rate][vtbi][settings]
+    |
+    when (ready == ReadyToOperate && block == BlockedState)
+        sound_alarm -> LINE[ready][BlockedState][rate][vtbi][settings]
+    |
+    when (ready == ReadyToOperate & block == UnblockedState)
+        block_line -> LINE[ready][BlockedState][rate][vtbi][settings]
+    |
+    when (ready == ReadyToOperate && block == UnblockedState && rate == SetRate && vtbi == SetVTBI && settings == SavedSettings)
+        stop -> INITIAL_LINE
+    |
+    error -> INITIAL_LINE
 ).
 
 // Assume that N is a number of channels to setup!
 ||PUMP(N=2) = (l[i:1..N]:INITIAL_LINE || PUMP_UI || POWER_BATTERY || POWER_ELECTRICITY || ALARM)
-			/{success/l[1..N].ready, //if the self-check is fine - lines are ready to operate
-				//as we set all the lines and saved the settings
-				confirm_saved_lines/l[1..N].confirm_settings, // we can confirm them
-				cancel_all_settings/l[1..N].discard_settings, // or cancel
-				stop_pump/l[1..N].stop, //if we turn off the pump - the lines are stopped
-				// if the error occured - the line is not ready to operate
-				error/l[1..N].error, // and settings are discarded
-				l[1..N].block_line/block_line, //blocking any line will result in either error
-				l[1..N].unblock_line/unblock_line,
-				power_outage/l[1..N].error, //or line unblocking
-				electricity_on/turn_on_electricity, // if we select electricity as a power source, turn it on
-				switch_on_battery/turn_off_electricity, // if we select to switch on battery as a power source, turn electricity off
-				battery_on/turn_on_battery, // in pump ui battery_on action is shared with turn_on_battery inside POWER_BATTERY
-				battery_off/turn_off_battery, // in pump ui battery_off action is shared with turn_off_battery inside POWER_BATTERY
-				l[1..N].sound_alarm/sound, // alarming line will result the alarm system to sound 
-				l[1..N].unblock_line/silent, // unblocking line will result the alarm system to silent
-				turn_off/turn_off_electricity, // when turn off the pump, we turn off all power sources 
-				turn_off/turn_off_battery}.
+            /{success/l[1..N].ready, //if the self-check is fine - lines are ready to operate
+                //as we set all the lines and saved the settings
+                confirm_saved_lines/l[1..N].confirm_settings, // we can confirm them
+                cancel_all_settings/l[1..N].discard_settings, // or cancel
+                stop_pump/l[1..N].stop, //if we turn off the pump - the lines are stopped
+                // if the error occured - the line is not ready to operate
+                error/l[1..N].error, // and settings are discarded
+                l[1..N].block_line/block_line, //blocking any line will result in either error
+                l[1..N].unblock_line/unblock_line,
+                power_outage/l[1..N].error, //or line unblocking
+                electricity_on/turn_on_electricity, // if we select electricity as a power source, turn it on
+                switch_on_battery/turn_off_electricity, // if we select to switch on battery as a power source, turn electricity off
+                battery_on/turn_on_battery, // in pump ui battery_on action is shared with turn_on_battery from POWER_BATTERY
+                battery_off/turn_off_battery, // in pump ui battery_off action is shared with turn_off_battery from POWER_BATTERY
+                l[1..N].sound_alarm/sound, // alarming line will result the alarm system to sound 
+                l[1..N].unblock_line/silent, // unblocking line will result the alarm system to silent
+                turn_off/turn_off_electricity, // when turn off the pump, we turn off all power sources 
+                turn_off/turn_off_battery}.
 
 
-fluent SETTINGS_CONFIRMED = <
-	{confirm_saved_lines}, // TRUE when confirmed
-	{start_infusion, error, power_outage} // FALSE right after any other action was performed
+fluent SETTINGS_CONFIRMED = < 
+    {confirm_saved_lines}, // TRUE when confirmed
+    {start_infusion, error, power_outage} // FALSE right after any other action was performed
 >
 
 assert INFUSION_AFTER_CONFIRM = (
-	(SETTINGS_CONFIRMED -> X start_infusion) // if settings were confirmed then the next action is start_infusion
-	&&
-	(!SETTINGS_CONFIRMED -> X !start_infusion) // if settings were not confirmed we cannot start_infusion
+    (SETTINGS_CONFIRMED -> X start_infusion) // if settings were confirmed then the next action is start_infusion
+    &&
+    (!SETTINGS_CONFIRMED -> X !start_infusion) // if settings were not confirmed we cannot start_infusion
 )
 
 
 fluent FAILURE_NOT_AVAILABLE = <
-	{power_outage, turn_on, //TRUE if power_outage not available
-		check_electricity}, 
-	{electricity_on, battery_on} //FALSE if power_outage is available
+    {power_outage, turn_on, //TRUE if power_outage not available
+        check_electricity}, 
+    {electricity_on, battery_on} //FALSE if power_outage is available
 > 
 
 assert FAILURE_AVAILABLE_ASSERT = (
-	(FAILURE_NOT_AVAILABLE -> <>power_outage) 
-	&& 
-	([]power_outage -> !FAILURE_NOT_AVAILABLE)
+    (FAILURE_NOT_AVAILABLE -> <>power_outage) 
+    && 
+    ([]power_outage -> !FAILURE_NOT_AVAILABLE)
 )
 
 
 fluent BACKUP_BATTERY = <
-	{battery_off},  //TRUE if battery fails
-	{electricity_on} 
+    {battery_off},  //TRUE if battery fails
+    {electricity_on} 
 > 
 
 assert BACKUP_BATTERY_ASSERT = (
-	(BACKUP_BATTERY -> <>start_infusion) 
-	&& 
-	([]start_infusion -> !BACKUP_BATTERY)
+    (BACKUP_BATTERY -> <>start_infusion) 
+    && 
+    ([]start_infusion -> !BACKUP_BATTERY)
 )
 
 assert POSSIBLE_RESUME = ([](error -> <>infuse) || [](power_outage -> <>infuse))
@@ -344,9 +387,9 @@ assert POSSIBLE_RESUME = ([](error -> <>infuse) || [](power_outage -> <>infuse))
 fluent SOUND_ALARM = <{block_line}, {unblock_line}> 
 
 assert SOUND_ALARM_ASSERT = (
-	(SOUND_ALARM -> <>sound_alarm) 
-	&& 
-	([]sound_alarm -> !SOUND_ALARM)
+    (SOUND_ALARM -> <>sound_alarm) 
+    && 
+    ([]sound_alarm -> !SOUND_ALARM)
 )
 
 
