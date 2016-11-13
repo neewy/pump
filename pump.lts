@@ -82,16 +82,16 @@ const EMPTY_SET = 0
 // BATTERY
 POWER_BATTERY = BATTERY_OFF,
 // activate battery by turn on action 
-BATTERY_OFF = (turn_on_battery -> BATTERY_ON),
+BATTERY_OFF = (turn_off_battery -> BATTERY_OFF | turn_on_battery -> BATTERY_ON),
 // deactivate battery by turn off action
-BATTERY_ON = (turn_off_battery -> BATTERY_OFF).
+BATTERY_ON = (turn_on_battery -> BATTERY_ON | turn_off_battery -> BATTERY_OFF).
 
 // ELECTRICITY
 POWER_ELECTRICITY = ELECTRICITY_OFF,
 // activate electricity by turn on action 
-ELECTRICITY_OFF = (turn_on_electricity -> ELECTRICITY_ON),
+ELECTRICITY_OFF = (turn_off_electricity -> ELECTRICITY_OFF | turn_on_electricity -> ELECTRICITY_ON),
 // deactivate electricity by turn off action 
-ELECTRICITY_ON = (turn_off_electricity -> ELECTRICITY_OFF).
+ELECTRICITY_ON = (turn_on_electricity -> ELECTRICITY_ON | turn_off_electricity -> ELECTRICITY_OFF).
 
 
 //~~~~~~~~~~~~~~~
